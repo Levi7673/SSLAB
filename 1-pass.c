@@ -1,142 +1,141 @@
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
+#include <stdlib.h>
+#include <conio.h>
 
-#define MAX 30
+char opcode[10], operand[10], label[10], t1[10], t2[10], t3[10];
+int locctr, start, len, s = -1, o = -1, i, j = 0, flag, size = 0, opd;
+FILE *fp1, *fp2, *fp3, *fp4, *fp5;
 
-typedef struct {
+struct SYMTAB {
     char label[10];
     int addr;
-} SYMTAB;
+} ST[30];
 
-typedef struct {
+struct OPTAB {
     char opcode[10];
     char hexcode[10];
-} OPTAB;
+} OT[30];
 
-SYMTAB symtab[MAX];
-OPTAB optab[MAX];
-
-char label[10], opcode[10], operand[10];
-int symCount = 0, optCount = 0;
-int locctr = 0, startAddr = 0, programLen = 0;
-
-FILE *fin, *fopt, *fsym, *fint, *flen;
-
-void readOptab() {
-    while (fscanf(fopt, "%s %s", optab[optCount].opcode, optab[optCount].hexcode) != EOF) {
-        optCount++;
+void read_OPTAB() {
+    while (1) {
+        o++;
+        fscanf(fp2, "%s%s", OT[o].opcode, OT[o].hexcode);
+        if (getc(fp2) == EOF) {
+            break;
+        }
     }
 }
 
-void parseLine(FILE *fp) {
-    char temp[3][10] = {"", "", ""};
-    int count = fscanf(fp, "%s", temp[0]);
-    if (count != 1) return;
-
-    if (fscanf(fp, "%s", temp[1]) == 1) {
-        if (fscanf(fp, "%s", temp[2]) == 1) {
-            strcpy(label, temp[0]);
-            strcpy(opcode, temp[1]);
-            strcpy(operand, temp[2]);
-        } else {
-            strcpy(label, "");
-            strcpy(opcode, temp[0]);
-            strcpy(operand, temp[1]);
+void read_line() {
+    strcpy(t1, "");
+    strcpy(t2, "");
+    strcpy(t3, "");
+    fscanf(fp1, "%s", t1);
+    if (getc(fp1) != '\n') {
+        fscanf(fp1, "%s", t2);
+        if (getc(fp1) != '\n') {
+            fscanf(fp1, "%s", t3);
         }
-    } else {
+    }
+
+    if (strcmp(t1, "") != 0 && strcmp(t2, "") != 0 && strcmp(t3, "") != 0) {
+        strcpy(label, t1);
+        strcpy(opcode, t2);
+        strcpy(operand, t3);
+    } else if (strcmp(t1, "") != 0 && strcmp(t2, "") != 0 && strcmp(t3, "") == 0) {
         strcpy(label, "");
-        strcpy(opcode, temp[0]);
+        strcpy(opcode, t1);
+        strcpy(operand, t2);
+    } else if (strcmp(t1, "") != 0 && strcmp(t2, "") == 0 && strcmp(t3, "") == 0) {
+        strcpy(label, "");
+        strcpy(opcode, t1);
         strcpy(operand, "");
     }
 }
 
-int isOpcode(char *code) {
-    for (int i = 0; i < optCount; i++) {
-        if (strcmp(optab[i].opcode, code) == 0)
-            return 1;
-    }
-    return 0;
-}
-
-int symbolExists(char *lbl) {
-    for (int i = 0; i < symCount; i++) {
-        if (strcmp(symtab[i].label, lbl) == 0)
-            return 1;
-    }
-    return 0;
-}
-
-void addSymbol(char *lbl, int addr) {
-    if (symbolExists(lbl)) {
-        printf("Error: Duplicate symbol %s\n", lbl);
-        exit(1);
-    }
-    strcpy(symtab[symCount].label, lbl);
-    symtab[symCount++].addr = addr;
-}
-
 int main() {
-    fin = fopen("input.txt", "r");
-    fopt = fopen("optab.txt", "r");
-    fsym = fopen("symtab.txt", "w");
-    fint = fopen("intermed.txt", "w");
-    flen = fopen("length.txt", "w");
+    fp1 = fopen("input.txt", "r");
+    fp2 = fopen("optab.txt", "r");
+    fp3 = fopen("symtab.txt", "w");
+    fp4 = fopen("intermed.txt", "w");
+    fp5 = fopen("length.txt", "w");
 
-    readOptab();
+    read_OPTAB();
 
-    fscanf(fin, "%s %s %s", label, opcode, operand);
+    fscanf(fp1, "%s%s%s", label, opcode, operand);
+
     if (strcmp(opcode, "START") == 0) {
-        startAddr = atoi(operand);
-        locctr = startAddr;
-        fprintf(fint, "\t%s\t%s\t%s\n", label, opcode, operand);
+        start = atoi(operand);
+        locctr = start;
+        fprintf(fp4, "\t%s\t%s\t%s\n", label, opcode, operand);
+        read_line();
     } else {
         locctr = 0;
-        strcpy(label, "");
     }
 
-    parseLine(fin);
     while (strcmp(opcode, "END") != 0) {
-        fprintf(fint, "%d\t%s\t%s\t%s\n", locctr, label, opcode, operand);
+        fprintf(fp4, "%d\t%s\t%s\t%s\n", locctr, label, opcode, operand);
 
         if (strcmp(label, "") != 0) {
-            addSymbol(label, locctr);
+            for (i = 0; i <= s; i++) {
+                if (strcmp(ST[i].label, label) == 0) {
+                    printf("Error: Duplicate Symbol\n");
+                    exit(0);
+                }
+            }
+            s++;
+            strcpy(ST[s].label, label);
+            ST[s].addr = locctr;
         }
 
-        if (isOpcode(opcode)) {
-            locctr += 3;
-            programLen += 3;
-        } else if (strcmp(opcode, "WORD") == 0) {
-            locctr += 3;
-            programLen += 3;
-        } else if (strcmp(opcode, "RESW") == 0) {
-            int w = atoi(operand);
-            locctr += 3 * w;
-        } else if (strcmp(opcode, "RESB") == 0) {
-            locctr += atoi(operand);
-        } else if (strcmp(opcode, "BYTE") == 0) {
-            int len = (operand[0] == 'X') ? (strlen(operand) - 3) / 2 : strlen(operand) - 3;
-            locctr += len;
-            programLen += len;
+        flag = 0;
+        for (i = 0; i <= o; i++) {
+            if (strcmp(opcode, OT[i].opcode) == 0) {
+                locctr += 3;
+                size += 3;
+                flag = 1;
+                break;
+            }
         }
 
-        parseLine(fin);
+        if (flag == 0) {
+            if (strcmp(opcode, "WORD") == 0) {
+                locctr += 3;
+                size += 3;
+            } else if (strcmp(opcode, "RESW") == 0) {
+                opd = atoi(operand);
+                locctr += 3 * opd;
+            } else if (strcmp(opcode, "RESB") == 0) {
+                opd = atoi(operand);
+                locctr += opd;
+            } else if (strcmp(opcode, "BYTE") == 0) {
+                if (operand[0] == 'X')
+                    len = (strlen(operand) - 3) / 2;
+                else
+                    len = strlen(operand) - 3;
+                locctr += len;
+                size += len;
+            }
+        }
+
+        read_line();
     }
 
-    fprintf(fint, "\t%s\t%s\t%s\n", label, opcode, operand);
+    fprintf(fp4, "\t%s\t%s\t%s\n", label, opcode, operand);
 
-    for (int i = 0; i < symCount; i++) {
-        fprintf(fsym, "%s\t%d\n", symtab[i].label, symtab[i].addr);
+    for (i = 0; i <= s; i++) {
+        fprintf(fp3, "%s\t%d\n", ST[i].label, ST[i].addr);
     }
 
-    fprintf(flen, "%d\n%d\n", startAddr, programLen);
+    fprintf(fp5, "%d\n", start);
+    fprintf(fp5, "%d\n", size);
 
-    fclose(fin);
-    fclose(fopt);
-    fclose(fsym);
-    fclose(fint);
-    fclose(flen);
+    fclose(fp1);
+    fclose(fp2);
+    fclose(fp3);
+    fclose(fp4);
+    fclose(fp5);
 
-    printf("Pass 1 complete. Intermediate files generated.\n");
     return 0;
 }
